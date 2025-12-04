@@ -1,152 +1,325 @@
 <!DOCTYPE html>
 <html lang="zh">
-  <head>
-    <meta charset="UTF-8" />
+<head>
+    <meta charset="UTF-8">
     <title>图片上传器 (端口: 5555)</title>
     <style>
-      /* ... 样式代码 ... */
-      body {
-        font-family: sans-serif;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        padding: 50px;
-      }
-      #drop-area {
-        border: 2px dashed #ccc;
-        border-radius: 20px;
-        width: 400px;
-        height: 200px;
-        text-align: center;
-        line-height: 200px;
-        font-size: 1.2em;
-        margin-bottom: 20px;
-        cursor: pointer;
-      }
-      #drop-area.highlight {
-        border-color: purple;
-      }
-      #result {
-        margin-top: 20px;
-        padding: 10px;
-        border: 1px solid #eee;
-        min-height: 50px;
-      }
-      .url-link {
-        color: blue;
-        text-decoration: underline;
-        cursor: copy;
-      }
-    </style>
-  </head>
-  <body>
-    <h2>图片上传 (拖拽或粘贴)</h2>
-
-    <div id="drop-area">拖拽图片到此处 或 Ctrl+V 粘贴</div>
-
-    <div id="result">等待上传...</div>
-
-    <script>
-      const dropArea = document.getElementById("drop-area");
-      const resultDiv = document.getElementById("result");
-
-      function uploadFile(file) {
-        if (!file.type.startsWith("image/")) {
-          resultDiv.innerHTML = "<strong>错误:</strong> 只允许上传图片文件。";
-          return;
+        /* ------------------- 基础布局样式 ------------------- */
+        body { 
+            font-family: sans-serif; 
+            display: flex; 
+            flex-direction: column; 
+            align-items: center; 
+            padding: 50px; 
+            background-color: #f4f4f4;
+        }
+        #drop-area { 
+            border: 3px dashed #7ac142; /* 使用醒目的绿色边框 */
+            border-radius: 20px; 
+            width: 400px; 
+            height: 200px; 
+            text-align: center; 
+            font-size: 1.2em; 
+            font-weight: bold;
+            color: #555;
+            margin-bottom: 20px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            user-select: none;
+            transition: all 0.2s ease-in-out;
+        }
+        #drop-area.highlight { 
+            border-color: #007bff; 
+            background-color: #e9f5ff; 
+            transform: scale(1.02);
+        }
+        #result { 
+            margin-top: 20px; 
+            padding: 15px; 
+            border: 1px solid #ddd; 
+            background-color: white;
+            min-height: 50px; 
+            width: 400px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+            word-wrap: break-word;
+        }
+        .url-link { 
+            color: #007bff; 
+            text-decoration: underline; 
+            cursor: copy; 
+        }
+        
+        /* 隐藏的粘贴捕获区域 (用于 HTTP 兼容) */
+        #paste-catcher {
+            position: absolute; 
+            top: -1000px; 
+            left: -1000px; 
+            opacity: 0;
+            width: 1px;
+            height: 1px;
+            overflow: hidden;
+            pointer-events: none;
         }
 
-        resultDiv.innerHTML = "正在上传 " + file.name + "...";
+        /* ------------------- 复制成功动画样式 ------------------- */
+        #success-animation {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 160px; /* 稍微放大 */
+            height: 160px;
+            background-color: rgba(0, 0, 0, 0.8); /* 更深的背景 */
+            color: white;
+            border-radius: 15px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            opacity: 0;
+            pointer-events: none;
+            z-index: 1000;
+            transition: opacity 0.3s ease-in-out;
+            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.5); /* 醒目的阴影 */
+        }
+        
+        #success-animation.show {
+            opacity: 1;
+        }
+        
+        .checkmark {
+            width: 70px; /* 放大图标 */
+            height: 70px;
+            border-radius: 50%;
+            display: block;
+            stroke-width: 4;
+            stroke: #fff;
+            stroke-miterlimit: 10;
+            margin: 0 auto;
+            box-shadow: inset 0px 0px 0px #7ac142;
+            animation: fill .4s ease-in-out .4s forwards, scale .3s ease-in-out .9s both;
+        }
+        
+        .checkmark__circle {
+            stroke-dasharray: 166;
+            stroke-dashoffset: 166;
+            stroke-width: 4;
+            stroke-miterlimit: 10;
+            stroke: #7ac142; /* Apple Pay 风格的绿色 */
+            fill: none;
+            animation: stroke 0.6s cubic-bezier(0.65, 0, 0.45, 1) forwards;
+        }
+        
+        .checkmark__check {
+            transform-origin: 50% 50%;
+            stroke-dasharray: 48;
+            stroke-dashoffset: 48;
+            animation: stroke 0.3s cubic-bezier(0.65, 0, 0.45, 1) .8s forwards;
+        }
 
-        const formData = new FormData();
-        formData.append("file", file);
+        /* 关键帧动画 */
+        @keyframes stroke {
+            100% {
+                stroke-dashoffset: 0;
+            }
+        }
+        @keyframes fill {
+            100% {
+                box-shadow: inset 0px 0px 0px 35px #7ac142; /* 扩大填充范围 */
+            }
+        }
+        @keyframes scale {
+            0%, 100% {
+                transform: none;
+            }
+            50% {
+                transform: scale3d(1.1, 1.1, 1); /* 轻微的弹性效果 */
+            }
+        }
+    </style>
+</head>
+<body>
 
-        fetch("/upload", {
-          method: "POST",
-          body: formData,
-        })
-          .then((response) => response.json())
-          .then((data) => {
-            if (data.success) {
-              const link = `<a href="${data.url}" target="_blank" class="url-link">${data.url}</a>`;
-              resultDiv.innerHTML = `
+    <h2>图片上传 (拖拽或粘贴)</h2>
+
+    <div id="drop-area">
+        拖拽图片到此处 或 Ctrl+V 粘贴
+    </div>
+    
+    <div id="result">
+        等待上传...
+    </div>
+
+    <div 
+        id="paste-catcher" 
+        contenteditable="true" 
+        tabindex="-1">
+    </div>
+
+    <div id="success-animation">
+        <p style="margin-top: 10px; font-size: 1.2em;"></p>
+        <svg class="checkmark" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 52 52">
+            <circle class="checkmark__circle" cx="26" cy="26" r="25" fill="none"/>
+            <path class="checkmark__check" fill="none" d="M14.1 27.2l7.1 7.2 16.7-16.8"/>
+        </svg>
+        <p style="margin-top: 10px; font-size: 1.2em;">复制成功</p>
+    </div>
+
+    <script>
+        const dropArea = document.getElementById('drop-area');
+        const resultDiv = document.getElementById('result');
+        const pasteCatcher = document.getElementById('paste-catcher');
+        const successAnimation = document.getElementById('success-animation');
+
+        // --- 核心功能：处理上传 ---
+        function uploadFile(file) {
+            if (!file || !file.type.startsWith('image/')) {
+                resultDiv.innerHTML = "<strong>错误:</strong> 只允许上传图片文件。";
+                return;
+            }
+
+            resultDiv.innerHTML = "正在上传 " + file.name + " (" + (file.size / 1024).toFixed(2) + " KB)...";
+
+            const formData = new FormData();
+            formData.append('file', file, file.name || 'pasted_image.png');
+
+            fetch('/upload', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    const link = `<a href="${data.url}" target="_blank" class="url-link">${data.url}</a>`;
+                    
+                    const copyFunctionCall = `copyLinkAndShowSuccess('${data.url}')`;
+
+                    resultDiv.innerHTML = `
                         <strong>✅ 上传成功！</strong><br>
                         ZIP 文件名: ${data.filename}<br>
                         图片链接 (24小时内有效): ${link} 
-                        <span style="color: green; cursor:pointer;" onclick="navigator.clipboard.writeText('${data.url}')">(点击复制链接)</span>
+                        <span 
+                            style="color: #7ac142; cursor:pointer; font-weight: bold;" 
+                            onclick="${copyFunctionCall}"
+                        >
+                            [点击复制]
+                        </span>
                     `;
-            } else {
-              resultDiv.innerHTML = `<strong>❌ 上传失败:</strong> ${data.error}`;
-            }
-          })
-          .catch((error) => {
-            resultDiv.innerHTML = `<strong>❌ 网络错误:</strong> ${error}`;
-          });
-      }
-
-      // --- 拖拽 (Drag & Drop) 和 粘贴 (Ctrl+V Paste) 逻辑 (同前) ---
-
-      ["dragenter", "dragover", "dragleave", "drop"].forEach((eventName) => {
-        dropArea.addEventListener(eventName, preventDefaults, false);
-      });
-
-      function preventDefaults(e) {
-        e.preventDefault();
-        e.stopPropagation();
-      }
-
-      ["dragenter", "dragover"].forEach((eventName) => {
-        dropArea.addEventListener(
-          eventName,
-          () => dropArea.classList.add("highlight"),
-          false
-        );
-      });
-
-      ["dragleave", "drop"].forEach((eventName) => {
-        dropArea.addEventListener(
-          eventName,
-          () => dropArea.classList.remove("highlight"),
-          false
-        );
-      });
-
-      dropArea.addEventListener("drop", handleDrop, false);
-
-      function handleDrop(e) {
-        let dt = e.dataTransfer;
-        let files = dt.files;
-
-        if (files.length > 0) {
-          uploadFile(files[0]);
+                } else {
+                    resultDiv.innerHTML = `<strong>❌ 上传失败:</strong> ${data.error}`;
+                }
+            })
+            .catch(error => {
+                resultDiv.innerHTML = `<strong>❌ 网络错误:</strong> ${error}`;
+            });
         }
-      }
+        
+        // --- 复制并显示醒目动画 ---
+        window.copyLinkAndShowSuccess = function(url) {
+            navigator.clipboard.writeText(url).then(() => {
+                
+                // 1. 重置动画：强制浏览器重新渲染 SVG，使动画能够再次播放
+                const checkmark = successAnimation.querySelector('.checkmark');
+                checkmark.style.animation = 'none';
+                checkmark.offsetHeight; // 强制DOM重绘
+                checkmark.style.animation = '';
+                
+                // 2. 显示动画容器
+                successAnimation.classList.add('show');
+                
+                // 3. 延迟隐藏动画容器 (总动画时间略长于CSS动画，确保完整播放)
+                setTimeout(() => {
+                    successAnimation.classList.remove('show');
+                }, 2000); // 2 秒后消失
 
-      document.addEventListener("paste", handlePaste);
-
-      function handlePaste(e) {
-        for (let i = 0; i < e.clipboardData.items.length; i++) {
-          const item = e.clipboardData.items[i];
-          if (item.kind === "file" && item.type.startsWith("image/")) {
-            const file = item.getAsFile();
-            uploadFile(file);
-            e.preventDefault();
-            return;
-          }
-        }
-      }
-
-      dropArea.addEventListener("click", () => {
-        const fileInput = document.createElement("input");
-        fileInput.type = "file";
-        fileInput.accept = "image/*";
-        fileInput.onchange = (e) => {
-          if (e.target.files.length > 0) {
-            uploadFile(e.target.files[0]);
-          }
+            }).catch(err => {
+                console.error('复制失败: ', err);
+                alert('复制失败！浏览器不支持或权限被拒绝。请手动复制链接。');
+            });
         };
-        fileInput.click();
-      });
+
+        // --- 1. 拖拽 (Drag & Drop) 实现 ---
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+            dropArea.addEventListener(eventName, preventDefaults, false);
+        });
+
+        function preventDefaults(e) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
+
+        ['dragenter', 'dragover'].forEach(eventName => {
+            dropArea.addEventListener(eventName, () => dropArea.classList.add('highlight'), false);
+        });
+
+        ['dragleave', 'drop'].forEach(eventName => {
+            dropArea.addEventListener(eventName, () => dropArea.classList.remove('highlight'), false);
+        });
+
+        dropArea.addEventListener('drop', handleDrop, false);
+
+        function handleDrop(e) {
+            let dt = e.dataTransfer;
+            let files = dt.files;
+
+            if (files.length > 0) {
+                uploadFile(files[0]);
+            }
+        }
+
+        dropArea.addEventListener('click', () => {
+            const fileInput = document.createElement('input');
+            fileInput.type = 'file';
+            fileInput.accept = 'image/*';
+            fileInput.onchange = (e) => {
+                if (e.target.files.length > 0) {
+                    uploadFile(e.target.files[0]);
+                }
+            };
+            fileInput.click();
+        });
+
+
+        // --- 2. 粘贴 (Ctrl+V Paste) 实现 (HTTP 兼容) ---
+
+        document.addEventListener('keydown', (e) => {
+            // 兼容 Ctrl+V (Windows/Linux) 和 Cmd+V (Mac)
+            const isPaste = (e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'v';
+            
+            // 只有在焦点不在输入框/文本区时才接管粘贴
+            if (isPaste && document.activeElement.tagName !== 'INPUT' && document.activeElement.tagName !== 'TEXTAREA') {
+                setTimeout(() => {
+                    pasteCatcher.focus();
+                    pasteCatcher.innerHTML = '';
+                }, 0);
+            }
+        });
+
+        pasteCatcher.addEventListener('paste', function(e) {
+            e.preventDefault();
+            
+            let handled = false;
+
+            for (let i = 0; i < e.clipboardData.items.length; i++) {
+                const item = e.clipboardData.items[i];
+                if (item.kind === 'file' && item.type.startsWith('image/')) {
+                    const file = item.getAsFile();
+                    uploadFile(file);
+                    handled = true;
+                    break; 
+                }
+            }
+            
+            pasteCatcher.blur(); 
+            
+            if (!handled) {
+                 resultDiv.innerHTML = "<strong>提示:</strong> 粘贴的内容不是图片文件。";
+            }
+        });
     </script>
-  </body>
+
+</body>
 </html>
