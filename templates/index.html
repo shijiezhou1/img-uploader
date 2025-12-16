@@ -481,18 +481,36 @@
 
         // --- 2. 粘贴 (Ctrl+V Paste) 实现 (HTTP 兼容) ---
 
-        document.addEventListener('keydown', (e) => {
-            // 兼容 Ctrl+V (Windows/Linux) 和 Cmd+V (Mac)
-            const isPaste = (e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'v';
+        // document.addEventListener('keydown', (e) => {
+        //     // 兼容 Ctrl+V (Windows/Linux) 和 Cmd+V (Mac)
+        //     const isPaste = (e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'v';
             
-            // 只有在焦点不在输入框/文本区时才接管粘贴
-            if (isPaste && document.activeElement.tagName !== 'INPUT' && document.activeElement.tagName !== 'TEXTAREA') {
-                setTimeout(() => {
-                    pasteCatcher.focus();
-                    pasteCatcher.innerHTML = '';
-                }, 0);
-            }
-        });
+        //     // 只有在焦点不在输入框/文本区时才接管粘贴
+        //     if (isPaste && document.activeElement.tagName !== 'INPUT' && document.activeElement.tagName !== 'TEXTAREA') {
+        //         setTimeout(() => {
+        //             pasteCatcher.focus();
+        //             pasteCatcher.innerHTML = '';
+        //         }, 0);
+        //     }
+        // });
+
+        document.addEventListener('paste', function (e) {
+  // 如果焦点在输入框/文本域，不拦截
+  const tag = document.activeElement.tagName.toLowerCase();
+  if (tag === 'input' || tag === 'textarea') return;
+
+  const items = e.clipboardData.items;
+  for (let i = 0; i < items.length; i++) {
+    const item = items[i];
+    if (item.kind === 'file' && item.type.startsWith('image/')) {
+      e.preventDefault();          // 阻止浏览器默认粘贴
+      uploadFile(item.getAsFile()); // 上传
+      return;
+    }
+  }
+  // 非图片内容给出提示
+  resultDiv.innerHTML = '<strong>提示:</strong> 粘贴的内容不是图片文件。';
+});
 
         pasteCatcher.addEventListener('paste', function(e) {
             e.preventDefault();
