@@ -1,388 +1,426 @@
 <!DOCTYPE html>
 <html lang="zh">
-<head>
-    <meta charset="UTF-8">
+  <head>
+    <meta charset="UTF-8" />
     <title>图片上传器 (端口: 5555)</title>
     <style>
-        /* ------------------- 基础布局样式 ------------------- */
-        body { 
-            font-family: sans-serif; 
-            display: flex; 
-            flex-direction: column; 
-            align-items: center; 
-            padding: 50px; 
-            background-color: #f4f4f4;
-        }
-        #drop-area { 
-            border: 3px dashed #7ac142; /* 使用醒目的绿色边框 */
-            border-radius: 20px; 
-            width: 400px; 
-            height: 200px; 
-            text-align: center; 
-            font-size: 1.2em; 
-            font-weight: bold;
-            color: #555;
-            margin-bottom: 20px;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            user-select: none;
-            transition: all 0.2s ease-in-out;
-        }
-        #drop-area.highlight { 
-            border-color: #007bff; 
-            background-color: #e9f5ff; 
-            transform: scale(1.02);
-        }
-        #result { 
-            margin-top: 20px; 
-            padding: 15px; 
-            border: 1px solid #ddd; 
-            background-color: white;
-            min-height: 50px; 
-            width: 400px;
-            border-radius: 8px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
-            word-wrap: break-word;
-        }
-        .url-link { 
-            color: #007bff; 
-            text-decoration: underline; 
-            cursor: copy; 
-        }
-        
-        /* 隐藏的粘贴捕获区域 (用于 HTTP 兼容) */
-        #paste-catcher {
-            position: absolute; 
-            top: -1000px; 
-            left: -1000px; 
-            opacity: 0;
-            width: 1px;
-            height: 1px;
-            overflow: hidden;
-            pointer-events: none;
-        }
+      /* ------------------- 基础布局样式 ------------------- */
+      body {
+        font-family: sans-serif;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        padding: 50px;
+        background-color: #f4f4f4;
+      }
+      #drop-area {
+        border: 3px dashed #7ac142; /* 使用醒目的绿色边框 */
+        border-radius: 20px;
+        width: 400px;
+        height: 200px;
+        text-align: center;
+        font-size: 1.2em;
+        font-weight: bold;
+        color: #555;
+        margin-bottom: 20px;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        user-select: none;
+        transition: all 0.2s ease-in-out;
+      }
+      #drop-area.highlight {
+        border-color: #007bff;
+        background-color: #e9f5ff;
+        transform: scale(1.02);
+      }
+      #result {
+        margin-top: 20px;
+        padding: 15px;
+        border: 1px solid #ddd;
+        background-color: white;
+        min-height: 50px;
+        width: 400px;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+        word-wrap: break-word;
+      }
+      .url-link {
+        color: #007bff;
+        text-decoration: underline;
+        cursor: copy;
+      }
 
-        /* ------------------- 复制成功动画样式 ------------------- */
-        #success-animation {
-            position: fixed;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            width: 160px; /* 稍微放大 */
-            height: 160px;
-            background-color: rgba(0, 0, 0, 0.8); /* 更深的背景 */
-            color: white;
-            border-radius: 15px;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            opacity: 0;
-            pointer-events: none;
-            z-index: 1000;
-            transition: opacity 0.3s ease-in-out;
-            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.5); /* 醒目的阴影 */
-        }
-        
-        #success-animation.show {
-            opacity: 1;
-        }
-        
-        .checkmark {
-            width: 70px; /* 放大图标 */
-            height: 70px;
-            border-radius: 50%;
-            display: block;
-            stroke-width: 4;
-            stroke: #fff;
-            stroke-miterlimit: 10;
-            margin: 0 auto;
-            box-shadow: inset 0px 0px 0px #7ac142;
-            animation: fill .4s ease-in-out .4s forwards, scale .3s ease-in-out .9s both;
-        }
-        
-        .checkmark__circle {
-            stroke-dasharray: 166;
-            stroke-dashoffset: 166;
-            stroke-width: 4;
-            stroke-miterlimit: 10;
-            stroke: #7ac142; /* Apple Pay 风格的绿色 */
-            fill: none;
-            animation: stroke 0.6s cubic-bezier(0.65, 0, 0.45, 1) forwards;
-        }
-        
-        .checkmark__check {
-            transform-origin: 50% 50%;
-            stroke-dasharray: 48;
-            stroke-dashoffset: 48;
-            animation: stroke 0.3s cubic-bezier(0.65, 0, 0.45, 1) .8s forwards;
-        }
+      /* 隐藏的粘贴捕获区域 (用于 HTTP 兼容) */
+      #paste-catcher {
+        position: absolute;
+        top: -1000px;
+        left: -1000px;
+        opacity: 0;
+        width: 1px;
+        height: 1px;
+        overflow: hidden;
+        pointer-events: none;
+      }
 
-        /* 关键帧动画 */
-        @keyframes stroke {
-            100% {
-                stroke-dashoffset: 0;
-            }
+      /* ------------------- 复制成功动画样式 ------------------- */
+      #success-animation {
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        width: 160px; /* 稍微放大 */
+        height: 160px;
+        background-color: rgba(0, 0, 0, 0.8); /* 更深的背景 */
+        color: white;
+        border-radius: 15px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        opacity: 0;
+        pointer-events: none;
+        z-index: 1000;
+        transition: opacity 0.3s ease-in-out;
+        box-shadow: 0 10px 20px rgba(0, 0, 0, 0.5); /* 醒目的阴影 */
+      }
+
+      #success-animation.show {
+        opacity: 1;
+      }
+
+      .checkmark {
+        width: 70px; /* 放大图标 */
+        height: 70px;
+        border-radius: 50%;
+        display: block;
+        stroke-width: 4;
+        stroke: #fff;
+        stroke-miterlimit: 10;
+        margin: 0 auto;
+        box-shadow: inset 0px 0px 0px #7ac142;
+        animation: fill 0.4s ease-in-out 0.4s forwards,
+          scale 0.3s ease-in-out 0.9s both;
+      }
+
+      .checkmark__circle {
+        stroke-dasharray: 166;
+        stroke-dashoffset: 166;
+        stroke-width: 4;
+        stroke-miterlimit: 10;
+        stroke: #7ac142; /* Apple Pay 风格的绿色 */
+        fill: none;
+        animation: stroke 0.6s cubic-bezier(0.65, 0, 0.45, 1) forwards;
+      }
+
+      .checkmark__check {
+        transform-origin: 50% 50%;
+        stroke-dasharray: 48;
+        stroke-dashoffset: 48;
+        animation: stroke 0.3s cubic-bezier(0.65, 0, 0.45, 1) 0.8s forwards;
+      }
+
+      /* 关键帧动画 */
+      @keyframes stroke {
+        100% {
+          stroke-dashoffset: 0;
         }
-        @keyframes fill {
-            100% {
-                box-shadow: inset 0px 0px 0px 35px #7ac142; /* 扩大填充范围 */
-            }
+      }
+      @keyframes fill {
+        100% {
+          box-shadow: inset 0px 0px 0px 35px #7ac142; /* 扩大填充范围 */
         }
-        @keyframes scale {
-            0%, 100% {
-                transform: none;
-            }
-            50% {
-                transform: scale3d(1.1, 1.1, 1); /* 轻微的弹性效果 */
-            }
+      }
+      @keyframes scale {
+        0%,
+        100% {
+          transform: none;
         }
+        50% {
+          transform: scale3d(1.1, 1.1, 1); /* 轻微的弹性效果 */
+        }
+      }
     </style>
-</head>
-<body>
-
+  </head>
+  <body>
     <h2>图片上传 & 简单标注 (拖拽或粘贴)</h2>
 
-    <div id="drop-area">
-        拖拽图片到此处 或 Ctrl+V 粘贴
-    </div>
-    
-    <div id="result">
-        等待上传...
-    </div>
+    <div id="drop-area">拖拽图片到此处 或 Ctrl+V 粘贴</div>
+
+    <div id="result">等待上传...</div>
 
     <!-- 简单图片标注编辑器 -->
-    <div id="editor" style="display:none; margin-top: 20px;">
-        <div style="margin-bottom: 10px;">
-            <span style="margin-right: 10px; font-weight: bold;">标注工具:</span>
-            <button id="tool-pen">画笔</button>
-            <button id="tool-rect">矩形</button>
-            <button id="tool-circle">圆形</button>
-            <label style="margin-left: 15px; font-weight: bold;">
-                颜色:
-                <input type="color" id="tool-color" value="#ff0000" style="vertical-align: middle; cursor:pointer;">
-            </label>
-            <button id="tool-undo">撤销</button>
-            <button id="tool-clear">清空</button>
-            <button id="tool-save">保存覆盖</button>
-        </div>
-        <canvas id="edit-canvas" style="border:1px solid #ccc; max-width: 100%;"></canvas>
+    <div id="editor" style="display: none; margin-top: 20px">
+      <div style="margin-bottom: 10px">
+        <span style="margin-right: 10px; font-weight: bold">标注工具:</span>
+        <button id="tool-pen">画笔</button>
+        <button id="tool-rect">矩形</button>
+        <button id="tool-circle">圆形</button>
+        <label style="margin-left: 15px; font-weight: bold">
+          颜色:
+          <input
+            type="color"
+            id="tool-color"
+            value="#ff0000"
+            style="vertical-align: middle; cursor: pointer"
+          />
+        </label>
+        <button id="tool-undo">撤销</button>
+        <button id="tool-clear">清空</button>
+        <button id="tool-save">保存覆盖</button>
+      </div>
+      <canvas
+        id="edit-canvas"
+        style="border: 1px solid #ccc; max-width: 100%"
+      ></canvas>
     </div>
 
-    <div 
-        id="paste-catcher" 
-        contenteditable="true" 
-        tabindex="-1">
-    </div>
+    <div id="paste-catcher" contenteditable="true" tabindex="-1"></div>
 
     <div id="success-animation">
-        <p style="margin-top: 10px; font-size: 1.2em;"></p>
-        <svg class="checkmark" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 52 52">
-            <circle class="checkmark__circle" cx="26" cy="26" r="25" fill="none"/>
-            <path class="checkmark__check" fill="none" d="M14.1 27.2l7.1 7.2 16.7-16.8"/>
-        </svg>
-        <p style="margin-top: 10px; font-size: 1.2em;">复制成功</p>
+      <p style="margin-top: 10px; font-size: 1.2em"></p>
+      <svg
+        class="checkmark"
+        xmlns="http://www.w3.org/2000/svg"
+        viewBox="0 0 52 52"
+      >
+        <circle class="checkmark__circle" cx="26" cy="26" r="25" fill="none" />
+        <path
+          class="checkmark__check"
+          fill="none"
+          d="M14.1 27.2l7.1 7.2 16.7-16.8"
+        />
+      </svg>
+      <p style="margin-top: 10px; font-size: 1.2em">复制成功</p>
     </div>
 
     <script>
-        const dropArea = document.getElementById('drop-area');
-        const resultDiv = document.getElementById('result');
-        const pasteCatcher = document.getElementById('paste-catcher');
-        const successAnimation = document.getElementById('success-animation');
+      const dropArea = document.getElementById("drop-area");
+      const resultDiv = document.getElementById("result");
+      const pasteCatcher = document.getElementById("paste-catcher");
+      const successAnimation = document.getElementById("success-animation");
 
-        const editor = document.getElementById('editor');
-        const editCanvas = document.getElementById('edit-canvas');
-        const ctx = editCanvas.getContext('2d');
+      const editor = document.getElementById("editor");
+      const editCanvas = document.getElementById("edit-canvas");
+      const ctx = editCanvas.getContext("2d");
 
-        const toolPenBtn = document.getElementById('tool-pen');
-        const toolRectBtn = document.getElementById('tool-rect');
-        const toolCircleBtn = document.getElementById('tool-circle');
-        const toolUndoBtn = document.getElementById('tool-undo');
-        const toolClearBtn = document.getElementById('tool-clear');
-        const toolSaveBtn = document.getElementById('tool-save');
-        const toolColorInput = document.getElementById('tool-color');
+      const toolPenBtn = document.getElementById("tool-pen");
+      const toolRectBtn = document.getElementById("tool-rect");
+      const toolCircleBtn = document.getElementById("tool-circle");
+      const toolUndoBtn = document.getElementById("tool-undo");
+      const toolClearBtn = document.getElementById("tool-clear");
+      const toolSaveBtn = document.getElementById("tool-save");
+      const toolColorInput = document.getElementById("tool-color");
 
-        let currentTool = 'pen';
-        let currentColor = '#ff0000';
-        let drawing = false;
-        let startX = 0;
-        let startY = 0;
-        let lastX = 0;
-        let lastY = 0;
-        let currentRandomId = null;
-        let currentImage = null;
-        let historyStack = []; // 用于简单撤销
+      let currentTool = "pen";
+      let currentColor = "#ff0000";
+      let drawing = false;
+      let startX = 0;
+      let startY = 0;
+      let lastX = 0;
+      let lastY = 0;
+      let currentRandomId = null;
+      let currentImage = null;
+      let historyStack = []; // 用于简单撤销
 
-        function setTool(tool) {
-            currentTool = tool;
+      function setTool(tool) {
+        currentTool = tool;
+      }
+
+      toolPenBtn.addEventListener("click", () => setTool("pen"));
+      toolRectBtn.addEventListener("click", () => setTool("rect"));
+      toolCircleBtn.addEventListener("click", () => setTool("circle"));
+
+      toolColorInput.addEventListener("input", (e) => {
+        currentColor = e.target.value || "#ff0000";
+      });
+
+      toolUndoBtn.addEventListener("click", () => {
+        if (historyStack.length > 0) {
+          const data = historyStack.pop();
+          ctx.putImageData(data, 0, 0);
         }
+      });
 
-        toolPenBtn.addEventListener('click', () => setTool('pen'));
-        toolRectBtn.addEventListener('click', () => setTool('rect'));
-        toolCircleBtn.addEventListener('click', () => setTool('circle'));
+      toolClearBtn.addEventListener("click", () => {
+        if (!currentImage) return;
+        ctx.clearRect(0, 0, editCanvas.width, editCanvas.height);
+        ctx.drawImage(currentImage, 0, 0, editCanvas.width, editCanvas.height);
+        historyStack = [];
+      });
 
-        toolColorInput.addEventListener('input', (e) => {
-            currentColor = e.target.value || '#ff0000';
-        });
-
-        toolUndoBtn.addEventListener('click', () => {
-            if (historyStack.length > 0) {
-                const data = historyStack.pop();
-                ctx.putImageData(data, 0, 0);
+      toolSaveBtn.addEventListener("click", () => {
+        if (!currentRandomId) return;
+        const dataURL = editCanvas.toDataURL("image/png");
+        fetch(`/edit_image/${currentRandomId}`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ image: dataURL }),
+        })
+          .then((res) => res.json())
+          .then((data) => {
+            if (data.success) {
+              resultDiv.innerHTML +=
+                "<br><strong>✅ 已保存标注并覆盖原图。</strong>";
+            } else {
+              resultDiv.innerHTML += `<br><strong>❌ 保存失败:</strong> ${data.error}`;
             }
-        });
+          })
+          .catch((err) => {
+            resultDiv.innerHTML += `<br><strong>❌ 网络错误(保存标注):</strong> ${err}`;
+          });
+      });
 
-        toolClearBtn.addEventListener('click', () => {
-            if (!currentImage) return;
-            ctx.clearRect(0, 0, editCanvas.width, editCanvas.height);
-            ctx.drawImage(currentImage, 0, 0, editCanvas.width, editCanvas.height);
-            historyStack = [];
-        });
+      function initEditorWithImage(imageUrl, randomId) {
+        currentRandomId = randomId;
+        currentImage = new Image();
+        currentImage.crossOrigin = "anonymous";
+        currentImage.onload = function () {
+          const maxWidth = 800;
+          const scale =
+            currentImage.width > maxWidth ? maxWidth / currentImage.width : 1;
+          editCanvas.width = currentImage.width * scale;
+          editCanvas.height = currentImage.height * scale;
+          ctx.clearRect(0, 0, editCanvas.width, editCanvas.height);
+          ctx.drawImage(
+            currentImage,
+            0,
+            0,
+            editCanvas.width,
+            editCanvas.height
+          );
+          historyStack = [];
+          editor.style.display = "block";
+        };
+        currentImage.src = imageUrl;
+      }
 
-        toolSaveBtn.addEventListener('click', () => {
-            if (!currentRandomId) return;
-            const dataURL = editCanvas.toDataURL('image/png');
-            fetch(`/edit_image/${currentRandomId}`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({ image: dataURL })
-            })
-            .then(res => res.json())
-            .then(data => {
-                if (data.success) {
-                    resultDiv.innerHTML += "<br><strong>✅ 已保存标注并覆盖原图。</strong>";
-                } else {
-                    resultDiv.innerHTML += `<br><strong>❌ 保存失败:</strong> ${data.error}`;
-                }
-            })
-            .catch(err => {
-                resultDiv.innerHTML += `<br><strong>❌ 网络错误(保存标注):</strong> ${err}`;
-            });
-        });
+      function getCanvasPos(e) {
+        const rect = editCanvas.getBoundingClientRect();
+        const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+        const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+        return {
+          x: clientX - rect.left,
+          y: clientY - rect.top,
+        };
+      }
 
-        function initEditorWithImage(imageUrl, randomId) {
-            currentRandomId = randomId;
-            currentImage = new Image();
-            currentImage.crossOrigin = 'anonymous';
-            currentImage.onload = function () {
-                const maxWidth = 800;
-                const scale = currentImage.width > maxWidth ? maxWidth / currentImage.width : 1;
-                editCanvas.width = currentImage.width * scale;
-                editCanvas.height = currentImage.height * scale;
-                ctx.clearRect(0, 0, editCanvas.width, editCanvas.height);
-                ctx.drawImage(currentImage, 0, 0, editCanvas.width, editCanvas.height);
-                historyStack = [];
-                editor.style.display = 'block';
-            };
-            currentImage.src = imageUrl;
+      function startDraw(e) {
+        if (!currentImage) return;
+        drawing = true;
+        const pos = getCanvasPos(e);
+        startX = lastX = pos.x;
+        startY = lastY = pos.y;
+        // 保存当前画布状态用于撤销
+        historyStack.push(
+          ctx.getImageData(0, 0, editCanvas.width, editCanvas.height)
+        );
+      }
+
+      function draw(e) {
+        if (!drawing) return;
+        const pos = getCanvasPos(e);
+        const x = pos.x;
+        const y = pos.y;
+
+        ctx.strokeStyle = currentColor;
+        ctx.lineWidth = 3;
+        ctx.lineCap = "round";
+        ctx.lineJoin = "round";
+
+        // 预览矩形/圆形时，可以先恢复上一次状态再画一次轮廓。
+        if (currentTool === "rect" || currentTool === "circle") {
+          // 先恢复到刚开始绘制前的状态
+          const base = historyStack[historyStack.length - 1];
+          ctx.putImageData(base, 0, 0);
         }
 
-        function getCanvasPos(e) {
-            const rect = editCanvas.getBoundingClientRect();
-            const clientX = e.touches ? e.touches[0].clientX : e.clientX;
-            const clientY = e.touches ? e.touches[0].clientY : e.clientY;
-            return {
-                x: clientX - rect.left,
-                y: clientY - rect.top
-            };
+        if (currentTool === "pen") {
+          ctx.beginPath();
+          ctx.moveTo(lastX, lastY);
+          ctx.lineTo(x, y);
+          ctx.stroke();
+          lastX = x;
+          lastY = y;
+        } else if (currentTool === "rect") {
+          ctx.beginPath();
+          ctx.rect(startX, startY, x - startX, y - startY);
+          ctx.stroke();
+        } else if (currentTool === "circle") {
+          ctx.beginPath();
+          const radius = Math.sqrt(
+            Math.pow(x - startX, 2) + Math.pow(y - startY, 2)
+          );
+          ctx.arc(startX, startY, radius, 0, Math.PI * 2);
+          ctx.stroke();
+        }
+      }
+
+      function endDraw() {
+        drawing = false;
+      }
+
+      editCanvas.addEventListener("mousedown", startDraw);
+      editCanvas.addEventListener("mousemove", draw);
+      window.addEventListener("mouseup", endDraw);
+
+      editCanvas.addEventListener(
+        "touchstart",
+        (e) => {
+          e.preventDefault();
+          startDraw(e);
+        },
+        { passive: false }
+      );
+      editCanvas.addEventListener(
+        "touchmove",
+        (e) => {
+          e.preventDefault();
+          draw(e);
+        },
+        { passive: false }
+      );
+      window.addEventListener(
+        "touchend",
+        (e) => {
+          e.preventDefault();
+          endDraw();
+        },
+        { passive: false }
+      );
+
+      // --- 核心功能：处理上传 ---
+      function uploadFile(file) {
+        if (!file || !file.type.startsWith("image/")) {
+          resultDiv.innerHTML = "<strong>错误:</strong> 只允许上传图片文件。";
+          return;
         }
 
-        function startDraw(e) {
-            if (!currentImage) return;
-            drawing = true;
-            const pos = getCanvasPos(e);
-            startX = lastX = pos.x;
-            startY = lastY = pos.y;
-            // 保存当前画布状态用于撤销
-            historyStack.push(ctx.getImageData(0, 0, editCanvas.width, editCanvas.height));
-        }
+        resultDiv.innerHTML =
+          "正在上传 " +
+          file.name +
+          " (" +
+          (file.size / 1024).toFixed(2) +
+          " KB)...";
 
-        function draw(e) {
-            if (!drawing) return;
-            const pos = getCanvasPos(e);
-            const x = pos.x;
-            const y = pos.y;
+        const formData = new FormData();
+        formData.append("file", file, file.name || "pasted_image.png");
 
-            ctx.strokeStyle = currentColor;
-            ctx.lineWidth = 3;
-            ctx.lineCap = 'round';
-            ctx.lineJoin = 'round';
+        fetch("/upload", {
+          method: "POST",
+          body: formData,
+        })
+          .then((response) => response.json())
+          .then((data) => {
+            if (data.success) {
+              const link = `<a href="${data.url}" target="_blank" class="url-link">${data.url}</a>`;
 
-            // 预览矩形/圆形时，可以先恢复上一次状态再画一次轮廓。
-            if (currentTool === 'rect' || currentTool === 'circle') {
-                // 先恢复到刚开始绘制前的状态
-                const base = historyStack[historyStack.length - 1];
-                ctx.putImageData(base, 0, 0);
-            }
+              const copyFunctionCall = `copyLinkAndShowSuccess('${data.url}')`;
 
-            if (currentTool === 'pen') {
-                ctx.beginPath();
-                ctx.moveTo(lastX, lastY);
-                ctx.lineTo(x, y);
-                ctx.stroke();
-                lastX = x;
-                lastY = y;
-            } else if (currentTool === 'rect') {
-                ctx.beginPath();
-                ctx.rect(startX, startY, x - startX, y - startY);
-                ctx.stroke();
-            } else if (currentTool === 'circle') {
-                ctx.beginPath();
-                const radius = Math.sqrt(Math.pow(x - startX, 2) + Math.pow(y - startY, 2));
-                ctx.arc(startX, startY, radius, 0, Math.PI * 2);
-                ctx.stroke();
-            }
-        }
-
-        function endDraw() {
-            drawing = false;
-        }
-
-        editCanvas.addEventListener('mousedown', startDraw);
-        editCanvas.addEventListener('mousemove', draw);
-        window.addEventListener('mouseup', endDraw);
-
-        editCanvas.addEventListener('touchstart', (e) => {
-            e.preventDefault();
-            startDraw(e);
-        }, { passive: false });
-        editCanvas.addEventListener('touchmove', (e) => {
-            e.preventDefault();
-            draw(e);
-        }, { passive: false });
-        window.addEventListener('touchend', (e) => {
-            e.preventDefault();
-            endDraw();
-        }, { passive: false });
-
-        // --- 核心功能：处理上传 ---
-        function uploadFile(file) {
-            if (!file || !file.type.startsWith('image/')) {
-                resultDiv.innerHTML = "<strong>错误:</strong> 只允许上传图片文件。";
-                return;
-            }
-
-            resultDiv.innerHTML = "正在上传 " + file.name + " (" + (file.size / 1024).toFixed(2) + " KB)...";
-
-            const formData = new FormData();
-            formData.append('file', file, file.name || 'pasted_image.png');
-
-            fetch('/upload', {
-                method: 'POST',
-                body: formData
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    const link = `<a href="${data.url}" target="_blank" class="url-link">${data.url}</a>`;
-                    
-                    const copyFunctionCall = `copyLinkAndShowSuccess('${data.url}')`;
-
-                    resultDiv.innerHTML = `
+              resultDiv.innerHTML = `
                         <strong>✅ 上传成功！</strong><br>
                         ZIP 文件名: ${data.filename}<br>
                         图片链接 (24小时内有效): ${link} 
@@ -394,146 +432,154 @@
                         </span>
                     `;
 
-                    // 初始化标注编辑器
-                    // 从返回的 URL 中提取 random_id（最后一段路径）
-                    try {
-                        const urlObj = new URL(data.url);
-                        const parts = urlObj.pathname.split('/');
-                        const randomId = parts[parts.length - 1];
-                        initEditorWithImage(data.url, randomId);
-                    } catch (e) {
-                        console.error('解析图片 URL 失败，无法初始化编辑器: ', e);
-                    }
-                } else {
-                    resultDiv.innerHTML = `<strong>❌ 上传失败:</strong> ${data.error}`;
-                }
-            })
-            .catch(error => {
-                resultDiv.innerHTML = `<strong>❌ 网络错误:</strong> ${error}`;
-            });
-        }
-        
-        // --- 复制并显示醒目动画 ---
-        window.copyLinkAndShowSuccess = function(url) {
-            navigator.clipboard.writeText(url).then(() => {
-                
-                // 1. 重置动画：强制浏览器重新渲染 SVG，使动画能够再次播放
-                const checkmark = successAnimation.querySelector('.checkmark');
-                checkmark.style.animation = 'none';
-                checkmark.offsetHeight; // 强制DOM重绘
-                checkmark.style.animation = '';
-                
-                // 2. 显示动画容器
-                successAnimation.classList.add('show');
-                
-                // 3. 延迟隐藏动画容器 (总动画时间略长于CSS动画，确保完整播放)
-                setTimeout(() => {
-                    successAnimation.classList.remove('show');
-                }, 2000); // 2 秒后消失
+              // 初始化标注编辑器
+              // 从返回的 URL 中提取 random_id（最后一段路径）
+              try {
+                const urlObj = new URL(data.url);
+                const parts = urlObj.pathname.split("/");
+                const randomId = parts[parts.length - 1];
+                initEditorWithImage(data.url, randomId);
+              } catch (e) {
+                console.error("解析图片 URL 失败，无法初始化编辑器: ", e);
+              }
+            } else {
+              resultDiv.innerHTML = `<strong>❌ 上传失败:</strong> ${data.error}`;
+            }
+          })
+          .catch((error) => {
+            resultDiv.innerHTML = `<strong>❌ 网络错误:</strong> ${error}`;
+          });
+      }
 
-            }).catch(err => {
-                console.error('复制失败: ', err);
-                alert('复制失败！浏览器不支持或权限被拒绝。请手动复制链接。');
-            });
+      // --- 复制并显示醒目动画 ---
+      window.copyLinkAndShowSuccess = function (url) {
+        navigator.clipboard
+          .writeText(url)
+          .then(() => {
+            // 1. 重置动画：强制浏览器重新渲染 SVG，使动画能够再次播放
+            const checkmark = successAnimation.querySelector(".checkmark");
+            checkmark.style.animation = "none";
+            checkmark.offsetHeight; // 强制DOM重绘
+            checkmark.style.animation = "";
+
+            // 2. 显示动画容器
+            successAnimation.classList.add("show");
+
+            // 3. 延迟隐藏动画容器 (总动画时间略长于CSS动画，确保完整播放)
+            setTimeout(() => {
+              successAnimation.classList.remove("show");
+            }, 2000); // 2 秒后消失
+          })
+          .catch((err) => {
+            console.error("复制失败: ", err);
+            alert("复制失败！浏览器不支持或权限被拒绝。请手动复制链接。");
+          });
+      };
+
+      // --- 1. 拖拽 (Drag & Drop) 实现 ---
+      ["dragenter", "dragover", "dragleave", "drop"].forEach((eventName) => {
+        dropArea.addEventListener(eventName, preventDefaults, false);
+      });
+
+      function preventDefaults(e) {
+        e.preventDefault();
+        e.stopPropagation();
+      }
+
+      ["dragenter", "dragover"].forEach((eventName) => {
+        dropArea.addEventListener(
+          eventName,
+          () => dropArea.classList.add("highlight"),
+          false
+        );
+      });
+
+      ["dragleave", "drop"].forEach((eventName) => {
+        dropArea.addEventListener(
+          eventName,
+          () => dropArea.classList.remove("highlight"),
+          false
+        );
+      });
+
+      dropArea.addEventListener("drop", handleDrop, false);
+
+      function handleDrop(e) {
+        let dt = e.dataTransfer;
+        let files = dt.files;
+
+        if (files.length > 0) {
+          uploadFile(files[0]);
+        }
+      }
+
+      dropArea.addEventListener("click", () => {
+        const fileInput = document.createElement("input");
+        fileInput.type = "file";
+        fileInput.accept = "image/*";
+        fileInput.onchange = (e) => {
+          if (e.target.files.length > 0) {
+            uploadFile(e.target.files[0]);
+          }
         };
+        fileInput.click();
+      });
 
-        // --- 1. 拖拽 (Drag & Drop) 实现 ---
-        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
-            dropArea.addEventListener(eventName, preventDefaults, false);
-        });
+      // --- 2. 粘贴 (Ctrl+V Paste) 实现 (HTTP 兼容) ---
 
-        function preventDefaults(e) {
-            e.preventDefault();
-            e.stopPropagation();
+      // document.addEventListener('keydown', (e) => {
+      //     // 兼容 Ctrl+V (Windows/Linux) 和 Cmd+V (Mac)
+      //     const isPaste = (e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'v';
+
+      //     // 只有在焦点不在输入框/文本区时才接管粘贴
+      //     if (isPaste && document.activeElement.tagName !== 'INPUT' && document.activeElement.tagName !== 'TEXTAREA') {
+      //         setTimeout(() => {
+      //             pasteCatcher.focus();
+      //             pasteCatcher.innerHTML = '';
+      //         }, 0);
+      //     }
+      // });
+
+      document.addEventListener("paste", function (e) {
+        // 如果焦点在输入框/文本域，不拦截
+        const tag = document.activeElement.tagName.toLowerCase();
+        if (tag === "input" || tag === "textarea") return;
+
+        const items = e.clipboardData.items;
+        for (let i = 0; i < items.length; i++) {
+          const item = items[i];
+          if (item.kind === "file" && item.type.startsWith("image/")) {
+            e.preventDefault(); // 阻止浏览器默认粘贴
+            uploadFile(item.getAsFile()); // 上传
+            return;
+          }
+        }
+        // 非图片内容给出提示
+        resultDiv.innerHTML = "<strong>提示:</strong> 粘贴的内容不是图片文件。";
+      });
+
+      pasteCatcher.addEventListener("paste", function (e) {
+        e.preventDefault();
+
+        let handled = false;
+
+        for (let i = 0; i < e.clipboardData.items.length; i++) {
+          const item = e.clipboardData.items[i];
+          if (item.kind === "file" && item.type.startsWith("image/")) {
+            const file = item.getAsFile();
+            uploadFile(file);
+            handled = true;
+            break;
+          }
         }
 
-        ['dragenter', 'dragover'].forEach(eventName => {
-            dropArea.addEventListener(eventName, () => dropArea.classList.add('highlight'), false);
-        });
+        pasteCatcher.blur();
 
-        ['dragleave', 'drop'].forEach(eventName => {
-            dropArea.addEventListener(eventName, () => dropArea.classList.remove('highlight'), false);
-        });
-
-        dropArea.addEventListener('drop', handleDrop, false);
-
-        function handleDrop(e) {
-            let dt = e.dataTransfer;
-            let files = dt.files;
-
-            if (files.length > 0) {
-                uploadFile(files[0]);
-            }
+        if (!handled) {
+          resultDiv.innerHTML =
+            "<strong>提示:</strong> 粘贴的内容不是图片文件。";
         }
-
-        dropArea.addEventListener('click', () => {
-            const fileInput = document.createElement('input');
-            fileInput.type = 'file';
-            fileInput.accept = 'image/*';
-            fileInput.onchange = (e) => {
-                if (e.target.files.length > 0) {
-                    uploadFile(e.target.files[0]);
-                }
-            };
-            fileInput.click();
-        });
-
-
-        // --- 2. 粘贴 (Ctrl+V Paste) 实现 (HTTP 兼容) ---
-
-        // document.addEventListener('keydown', (e) => {
-        //     // 兼容 Ctrl+V (Windows/Linux) 和 Cmd+V (Mac)
-        //     const isPaste = (e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'v';
-            
-        //     // 只有在焦点不在输入框/文本区时才接管粘贴
-        //     if (isPaste && document.activeElement.tagName !== 'INPUT' && document.activeElement.tagName !== 'TEXTAREA') {
-        //         setTimeout(() => {
-        //             pasteCatcher.focus();
-        //             pasteCatcher.innerHTML = '';
-        //         }, 0);
-        //     }
-        // });
-
-        document.addEventListener('paste', function (e) {
-  // 如果焦点在输入框/文本域，不拦截
-  const tag = document.activeElement.tagName.toLowerCase();
-  if (tag === 'input' || tag === 'textarea') return;
-
-  const items = e.clipboardData.items;
-  for (let i = 0; i < items.length; i++) {
-    const item = items[i];
-    if (item.kind === 'file' && item.type.startsWith('image/')) {
-      e.preventDefault();          // 阻止浏览器默认粘贴
-      uploadFile(item.getAsFile()); // 上传
-      return;
-    }
-  }
-  // 非图片内容给出提示
-  resultDiv.innerHTML = '<strong>提示:</strong> 粘贴的内容不是图片文件。';
-});
-
-        pasteCatcher.addEventListener('paste', function(e) {
-            e.preventDefault();
-            
-            let handled = false;
-
-            for (let i = 0; i < e.clipboardData.items.length; i++) {
-                const item = e.clipboardData.items[i];
-                if (item.kind === 'file' && item.type.startsWith('image/')) {
-                    const file = item.getAsFile();
-                    uploadFile(file);
-                    handled = true;
-                    break; 
-                }
-            }
-            
-            pasteCatcher.blur(); 
-            
-            if (!handled) {
-                 resultDiv.innerHTML = "<strong>提示:</strong> 粘贴的内容不是图片文件。";
-            }
-        });
+      });
     </script>
-
-</body>
+  </body>
 </html>
