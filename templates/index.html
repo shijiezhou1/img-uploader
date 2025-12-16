@@ -143,7 +143,7 @@
 </head>
 <body>
 
-    <h2>图片上传 (拖拽或粘贴)</h2>
+    <h2>图片上传 & 简单标注 (拖拽或粘贴)</h2>
 
     <div id="drop-area">
         拖拽图片到此处 或 Ctrl+V 粘贴
@@ -151,6 +151,20 @@
     
     <div id="result">
         等待上传...
+    </div>
+
+    <!-- 简单图片标注编辑器 -->
+    <div id="editor" style="display:none; margin-top: 20px;">
+        <div style="margin-bottom: 10px;">
+            <span style="margin-right: 10px; font-weight: bold;">标注工具:</span>
+            <button id="tool-pen">画笔</button>
+            <button id="tool-rect">矩形</button>
+            <button id="tool-circle">圆形</button>
+            <button id="tool-undo">撤销</button>
+            <button id="tool-clear">清空</button>
+            <button id="tool-save">保存覆盖</button>
+        </div>
+        <canvas id="edit-canvas" style="border:1px solid #ccc; max-width: 100%;"></canvas>
     </div>
 
     <div 
@@ -173,6 +187,167 @@
         const resultDiv = document.getElementById('result');
         const pasteCatcher = document.getElementById('paste-catcher');
         const successAnimation = document.getElementById('success-animation');
+
+        const editor = document.getElementById('editor');
+        const editCanvas = document.getElementById('edit-canvas');
+        const ctx = editCanvas.getContext('2d');
+
+        const toolPenBtn = document.getElementById('tool-pen');
+        const toolRectBtn = document.getElementById('tool-rect');
+        const toolCircleBtn = document.getElementById('tool-circle');
+        const toolUndoBtn = document.getElementById('tool-undo');
+        const toolClearBtn = document.getElementById('tool-clear');
+        const toolSaveBtn = document.getElementById('tool-save');
+
+        let currentTool = 'pen';
+        let drawing = false;
+        let startX = 0;
+        let startY = 0;
+        let lastX = 0;
+        let lastY = 0;
+        let currentRandomId = null;
+        let currentImage = null;
+        let historyStack = []; // 用于简单撤销
+
+        function setTool(tool) {
+            currentTool = tool;
+        }
+
+        toolPenBtn.addEventListener('click', () => setTool('pen'));
+        toolRectBtn.addEventListener('click', () => setTool('rect'));
+        toolCircleBtn.addEventListener('click', () => setTool('circle'));
+
+        toolUndoBtn.addEventListener('click', () => {
+            if (historyStack.length > 0) {
+                const data = historyStack.pop();
+                ctx.putImageData(data, 0, 0);
+            }
+        });
+
+        toolClearBtn.addEventListener('click', () => {
+            if (!currentImage) return;
+            ctx.clearRect(0, 0, editCanvas.width, editCanvas.height);
+            ctx.drawImage(currentImage, 0, 0, editCanvas.width, editCanvas.height);
+            historyStack = [];
+        });
+
+        toolSaveBtn.addEventListener('click', () => {
+            if (!currentRandomId) return;
+            const dataURL = editCanvas.toDataURL('image/png');
+            fetch(`/edit_image/${currentRandomId}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ image: dataURL })
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.success) {
+                    resultDiv.innerHTML += "<br><strong>✅ 已保存标注并覆盖原图。</strong>";
+                } else {
+                    resultDiv.innerHTML += `<br><strong>❌ 保存失败:</strong> ${data.error}`;
+                }
+            })
+            .catch(err => {
+                resultDiv.innerHTML += `<br><strong>❌ 网络错误(保存标注):</strong> ${err}`;
+            });
+        });
+
+        function initEditorWithImage(imageUrl, randomId) {
+            currentRandomId = randomId;
+            currentImage = new Image();
+            currentImage.crossOrigin = 'anonymous';
+            currentImage.onload = function () {
+                const maxWidth = 800;
+                const scale = currentImage.width > maxWidth ? maxWidth / currentImage.width : 1;
+                editCanvas.width = currentImage.width * scale;
+                editCanvas.height = currentImage.height * scale;
+                ctx.clearRect(0, 0, editCanvas.width, editCanvas.height);
+                ctx.drawImage(currentImage, 0, 0, editCanvas.width, editCanvas.height);
+                historyStack = [];
+                editor.style.display = 'block';
+            };
+            currentImage.src = imageUrl;
+        }
+
+        function getCanvasPos(e) {
+            const rect = editCanvas.getBoundingClientRect();
+            const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+            const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+            return {
+                x: clientX - rect.left,
+                y: clientY - rect.top
+            };
+        }
+
+        function startDraw(e) {
+            if (!currentImage) return;
+            drawing = true;
+            const pos = getCanvasPos(e);
+            startX = lastX = pos.x;
+            startY = lastY = pos.y;
+            // 保存当前画布状态用于撤销
+            historyStack.push(ctx.getImageData(0, 0, editCanvas.width, editCanvas.height));
+        }
+
+        function draw(e) {
+            if (!drawing) return;
+            const pos = getCanvasPos(e);
+            const x = pos.x;
+            const y = pos.y;
+
+            ctx.strokeStyle = '#ff0000';
+            ctx.lineWidth = 3;
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
+
+            // 预览矩形/圆形时，可以先恢复上一次状态再画一次轮廓。
+            if (currentTool === 'rect' || currentTool === 'circle') {
+                // 先恢复到刚开始绘制前的状态
+                const base = historyStack[historyStack.length - 1];
+                ctx.putImageData(base, 0, 0);
+            }
+
+            if (currentTool === 'pen') {
+                ctx.beginPath();
+                ctx.moveTo(lastX, lastY);
+                ctx.lineTo(x, y);
+                ctx.stroke();
+                lastX = x;
+                lastY = y;
+            } else if (currentTool === 'rect') {
+                ctx.beginPath();
+                ctx.rect(startX, startY, x - startX, y - startY);
+                ctx.stroke();
+            } else if (currentTool === 'circle') {
+                ctx.beginPath();
+                const radius = Math.sqrt(Math.pow(x - startX, 2) + Math.pow(y - startY, 2));
+                ctx.arc(startX, startY, radius, 0, Math.PI * 2);
+                ctx.stroke();
+            }
+        }
+
+        function endDraw() {
+            drawing = false;
+        }
+
+        editCanvas.addEventListener('mousedown', startDraw);
+        editCanvas.addEventListener('mousemove', draw);
+        window.addEventListener('mouseup', endDraw);
+
+        editCanvas.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            startDraw(e);
+        }, { passive: false });
+        editCanvas.addEventListener('touchmove', (e) => {
+            e.preventDefault();
+            draw(e);
+        }, { passive: false });
+        window.addEventListener('touchend', (e) => {
+            e.preventDefault();
+            endDraw();
+        }, { passive: false });
 
         // --- 核心功能：处理上传 ---
         function uploadFile(file) {
@@ -208,6 +383,17 @@
                             [点击复制]
                         </span>
                     `;
+
+                    // 初始化标注编辑器
+                    // 从返回的 URL 中提取 random_id（最后一段路径）
+                    try {
+                        const urlObj = new URL(data.url);
+                        const parts = urlObj.pathname.split('/');
+                        const randomId = parts[parts.length - 1];
+                        initEditorWithImage(data.url, randomId);
+                    } catch (e) {
+                        console.error('解析图片 URL 失败，无法初始化编辑器: ', e);
+                    }
                 } else {
                     resultDiv.innerHTML = `<strong>❌ 上传失败:</strong> ${data.error}`;
                 }

@@ -5,6 +5,7 @@ import time
 import threading
 import zipfile
 import io
+import base64
 from flask import Flask, request, render_template, url_for, jsonify, send_file
 from PIL import Image
 
@@ -161,6 +162,55 @@ def view_image(random_id):
         return "无效的 ZIP 存档。", 500
     except Exception as e:
         return f"加载图片时发生错误: {e}", 500
+
+
+@app.route('/edit_image/<random_id>', methods=['POST'])
+def edit_image(random_id):
+    """接收前端编辑后的图片（base64），并覆盖原 ZIP 内的图片"""
+    zip_filename = f"{random_id}.zip"
+    zip_filepath = os.path.join(app.config['UPLOAD_FOLDER'], zip_filename)
+
+    if not os.path.exists(zip_filepath):
+        return jsonify({'success': False, 'error': '目标文件不存在或已过期'}), 404
+
+    data = request.get_json(silent=True) or {}
+    image_data_url = data.get('image')
+
+    if not image_data_url or not isinstance(image_data_url, str):
+        return jsonify({'success': False, 'error': '缺少图片数据'}), 400
+
+    # 仅支持 data:image/png 或 jpeg 等 data URL
+    if not image_data_url.startswith('data:image/'):
+        return jsonify({'success': False, 'error': '图片数据格式不正确'}), 400
+
+    try:
+        header, b64_data = image_data_url.split(',', 1)
+    except ValueError:
+        return jsonify({'success': False, 'error': 'Base64 数据解析失败'}), 400
+
+    try:
+        image_bytes = base64.b64decode(b64_data)
+    except Exception:
+        return jsonify({'success': False, 'error': 'Base64 解码失败'}), 400
+
+    # 使用 Pillow 校验图片有效性
+    try:
+        img_buffer = io.BytesIO(image_bytes)
+        Image.open(img_buffer)
+    except Exception:
+        return jsonify({'success': False, 'error': '无效的图片文件'}), 400
+
+    # 统一覆盖为 PNG，内部文件名使用 ID.png
+    filename_inside_zip = f"{random_id}.png"
+
+    try:
+        with zipfile.ZipFile(zip_filepath, 'w', zipfile.ZIP_DEFLATED) as zf:
+            zf.writestr(filename_inside_zip, image_bytes)
+
+        file_url = url_for('view_image', random_id=random_id, _external=True)
+        return jsonify({'success': True, 'url': file_url}), 200
+    except Exception as e:
+        return jsonify({'success': False, 'error': f'保存编辑图片失败: {e}'}), 500
 
 if __name__ == '__main__':
     # 启动后台清理线程
