@@ -160,6 +160,10 @@
             <button id="tool-pen">画笔</button>
             <button id="tool-rect">矩形</button>
             <button id="tool-circle">圆形</button>
+            <label style="margin-left: 15px; font-weight: bold;">
+                颜色:
+                <input type="color" id="tool-color" value="#ff0000" style="vertical-align: middle; cursor:pointer;">
+            </label>
             <button id="tool-undo">撤销</button>
             <button id="tool-clear">清空</button>
             <button id="tool-save">保存覆盖</button>
@@ -198,8 +202,10 @@
         const toolUndoBtn = document.getElementById('tool-undo');
         const toolClearBtn = document.getElementById('tool-clear');
         const toolSaveBtn = document.getElementById('tool-save');
+        const toolColorInput = document.getElementById('tool-color');
 
         let currentTool = 'pen';
+        let currentColor = '#ff0000';
         let drawing = false;
         let startX = 0;
         let startY = 0;
@@ -216,6 +222,10 @@
         toolPenBtn.addEventListener('click', () => setTool('pen'));
         toolRectBtn.addEventListener('click', () => setTool('rect'));
         toolCircleBtn.addEventListener('click', () => setTool('circle'));
+
+        toolColorInput.addEventListener('input', (e) => {
+            currentColor = e.target.value || '#ff0000';
+        });
 
         toolUndoBtn.addEventListener('click', () => {
             if (historyStack.length > 0) {
@@ -297,7 +307,7 @@
             const x = pos.x;
             const y = pos.y;
 
-            ctx.strokeStyle = '#ff0000';
+            ctx.strokeStyle = currentColor;
             ctx.lineWidth = 3;
             ctx.lineCap = 'round';
             ctx.lineJoin = 'round';
